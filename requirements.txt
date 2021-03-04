@@ -1,7 +1,5 @@
 conda
 Flask
-Keras
-Keras-Preprocessing
 numpy
 Pillow
 requests
