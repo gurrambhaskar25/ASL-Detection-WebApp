@@ -1,9 +1,13 @@
 conda
 Flask
+Keras
+Keras-Applications
+Keras-Preprocessing
 numpy
+opencv-python
 Pillow
 requests
 tensorflow
-h5py~=2.10.0
+h5py
 matplotlib
 gunicorn
