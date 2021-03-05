@@ -1,13 +1,5 @@
-conda
-Flask
-Keras
-Keras-Applications
-Keras-Preprocessing
-numpy
-opencv-python
-Pillow
-requests
-tensorflow
-h5py
-matplotlib
+tensorflow~=2.3.0
+numpy~=1.18.1
+flask~=1.1.1
+werkzeug~=0.16.0
 gunicorn
