@@ -1,52 +1,88 @@
-from flask import Flask, render_template, request
-from werkzeug import secure_filename
-
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-import tensorflow as tf
-import numpy as np
+﻿from __future__ import division, print_function
+# coding=utf-8
+import sys
 import os
+import glob
+import re
+import numpy as np
 
+# Keras
+from keras.applications.imagenet_utils import preprocess_input, decode_predictions
+from keras.models import load_model
+from keras.preprocessing import image
 
-try:
-	import shutil
-	shutil.rmtree('uploaded / images')
+# Flask utils
+from flask import Flask, redirect, url_for, request, render_template
+from werkzeug.utils import secure_filename
+from gevent.wsgi import WSGIServer
 
-	print()
-except:
-	pass
-
-model = tf.keras.models.load_model('model')
+# Define a flask app
 app = Flask(__name__)
 
-app.config['UPLOAD_FOLDER'] = 'uploaded/images'
+# Model saved with Keras model.save()
+MODEL_PATH = 'models/my_model.h5'
 
-@app.route('/')
-def upload_f():
-	return render_template('upload.html')
+#Load your trained model
+model = load_model(MODEL_PATH)
+model._make_predict_function()          # Necessary to make everything ready to run on the GPU ahead of time
+print('Model loaded. Start serving...')
 
-def finds():
-	test_datagen = ImageDataGenerator(rescale = 1./255)
-	vals = {0:'A',1: 'B', 2: 'C'}# change this according to what you've trained your model to do
-	test_dir = 'uploaded'
-	test_generator = test_datagen.flow_from_directory(
-			test_dir,
-			target_size =(224, 224),
-			color_mode ="rgb",
-			shuffle = False,
-			class_mode ='categorical',
-			batch_size = 1)
+# You can also use pretrained model from Keras
+# Check https://keras.io/applications/
+#from keras.applications.resnet50 import ResNet50
+#model = ResNet50(weights='imagenet')
+#print('Model loaded. Check http://127.0.0.1:5000/')
 
-	pred = model.predict_generator(test_generator)
-	print(pred)
-	return str(vals[np.argmax(pred)])
 
-@app.route('/uploader', methods = ['GET', 'POST'])
-def upload_file():
-	if request.method == 'POST':
-		f = request.files['file']
-		f.save(os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(f.filename)))
-		val = finds()
-		return render_template('pred.html', ss = val)
+def model_predict(img_path, model):
+    img = image.load_img(img_path, target_size=(50,50)) #target_size must agree with what the trained model expects!!
 
+    # Preprocessing the image
+    img = image.img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+
+   
+    preds = model.predict(img)
+    pred = np.argmax(preds,axis = 1)
+    return pred
+
+
+@app.route('/', methods=['GET'])
+def index():
+    # Main page
+    return render_template('index.html')
+
+
+@app.route('/predict', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST':
+        # Get the file from post request
+        f = request.files['file']
+
+        # Save the file to ./uploads
+        basepath = os.path.dirname(__file__)
+        file_path = os.path.join(
+            basepath, 'uploads', secure_filename(f.filename))
+        f.save(file_path)
+
+        # Make prediction
+        pred = model_predict(file_path, model)
+        os.remove(file_path)#removes file from the server after prediction has been returned
+
+        # Arrange the correct return according to the model. 
+		# In this model 1 is Pneumonia and 0 is Normal.
+        str1 = 'Malaria Parasitized'
+        str2 = 'Normal'
+        if pred[0] == 0:
+            return str1
+        else:
+            return str2
+    return None
+
+    #this section is used by gunicorn to serve the app on Heroku
 if __name__ == '__main__':
-	app.run()
+        app.run()
+    #uncomment this section to serve the app locally with gevent at:  http://localhost:5000
+    # Serve the app with gevent 
+    #http_server = WSGIServer(('', 5000), app)
+    #http_server.serve_forever()
